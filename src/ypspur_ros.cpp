@@ -352,8 +352,10 @@ namespace ypspur_ros {
         odom_transform_.transform.rotation.z = quat.z();
         odom_transform_.transform.rotation.w = quat.w();
 
-        /* Broadcast TF */
-        odom_tf_broadcaster_->sendTransform(odom_transform_);
+        /* Broadcast TF if allowed */
+        if (publish_tf_) {
+          odom_tf_broadcaster_->sendTransform(odom_transform_);
+        }
 
         /* Update joint state */
         jointstate_msg_.header.stamp = now;
@@ -392,10 +394,8 @@ namespace ypspur_ros {
           /* Apply velocity command to YP-Spur */
           YP::YPSpur_vel(v_cmd, w_cmd);
 
-          /* Publish odometry and joint state if allowed. */
-          if (publish_tf_) {
-            publish_odometry();
-          }
+          /* Publish odometry and joint state. */
+          publish_odometry();
         }
 
         /* Update last command */
