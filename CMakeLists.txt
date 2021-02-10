@@ -1,69 +1,105 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.0.2)
 project(ypspur_ros)
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  message_generation
 
-# Default to C99
-if(NOT CMAKE_C_STANDARD)
-  set(CMAKE_C_STANDARD 99)
+  diagnostic_msgs
+  geometry_msgs
+  nav_msgs
+  sensor_msgs
+  std_msgs
+  tf
+  trajectory_msgs
+)
+
+add_message_files(
+  FILES
+  DigitalOutput.msg
+  DigitalInput.msg
+  ControlMode.msg
+  JointPositionControl.msg
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
+
+catkin_package(CATKIN_DEPENDS
+  roscpp
+  message_runtime
+
+  diagnostic_msgs
+  geometry_msgs
+  nav_msgs
+  sensor_msgs
+  std_msgs
+  tf
+  trajectory_msgs
+)
+find_package(Boost REQUIRED COMPONENTS chrono thread atomic REQUIRED)
+
+find_package(ypspur 1.17.0 REQUIRED)
+
+###########
+## Build ##
+###########
+
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+if(COMPILER_SUPPORTS_CXX11)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+elseif(COMPILER_SUPPORTS_CXX0X)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+else()
+  message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. ")
 endif()
 
-# Default to C++14
-if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
-endif()
 
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+include_directories(
+  include
+  ${catkin_INCLUDE_DIRS}
+  ${ypspur_INCLUDE_DIRS}
+)
 
-# find dependencies
-find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(nav_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(tf2 REQUIRED)
-find_package(tf2_ros REQUIRED)
-find_package(tf2_msgs REQUIRED)
-find_package(ypspur REQUIRED)
+add_executable(ypspur_ros src/ypspur_ros.cpp)
+target_link_libraries(ypspur_ros
+  ${catkin_LIBRARIES}
+  ypspur
+)
+add_dependencies(ypspur_ros ${ypspur_ros_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-# Add Node
-add_executable(ypspur_ros
-  src/ypspur_ros.cpp)
-target_include_directories(ypspur_ros
-  PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>)
-target_link_libraries(ypspur_ros ypspur)
-ament_target_dependencies(ypspur_ros
-  "rclcpp"
-  "class_loader"
-  "geometry_msgs"
-  "nav_msgs"
-  "sensor_msgs"
-  "tf2"
-  "tf2_ros"
-  "ypspur")
+add_executable(joint_tf_publisher src/joint_tf_publisher.cpp)
+target_link_libraries(joint_tf_publisher ${catkin_LIBRARIES})
+add_dependencies(joint_tf_publisher ${ypspur_ros_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+add_executable(joint_position_to_joint_trajectory src/joint_position_to_joint_trajectory.cpp)
+target_link_libraries(joint_position_to_joint_trajectory ${catkin_LIBRARIES})
+add_dependencies(joint_position_to_joint_trajectory ${ypspur_ros_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+#############
+## Install ##
+#############
 
 install(TARGETS
-  ypspur_ros
-  DESTINATION lib/${PROJECT_NAME}/)
+    ypspur_ros
+    joint_tf_publisher
+    joint_position_to_joint_trajectory
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
-install(DIRECTORY
-  config
-  launch
-  DESTINATION share/${PROJECT_NAME}/)
+#############
+## Testing ##
+#############
 
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # uncomment the line when a copyright and license is not present in all source files
-  #set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # uncomment the line when this package is not in a git repo
-  #set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
+if(CATKIN_ENABLE_TESTING)
+  add_subdirectory(test)
+  find_package(roslint REQUIRED)
+  roslint_cpp()
+  roslint_add_test()
 endif()
-
-ament_package()
